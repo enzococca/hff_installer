@@ -73,6 +73,11 @@ class InstallerDialog(QDialog):
         self.version_label.setStyleSheet("font-weight: bold;")
         status_layout.addWidget(self.version_label)
 
+        self.update_label = QLabel("")
+        self.update_label.setWordWrap(True)
+        self.update_label.setTextFormat(Qt.RichText)
+        status_layout.addWidget(self.update_label)
+
         self.path_label = QLabel("")
         self.path_label.setWordWrap(True)
         self.path_label.setStyleSheet("color: gray; font-size: 10px;")
@@ -165,6 +170,8 @@ class InstallerDialog(QDialog):
 
         :param info: Dict with exists, path, version, folder_name
         """
+        self._installed_version = info.get('version') if info['exists'] else None
+
         if info['exists']:
             self.status_label.setText("HFF is currently installed")
             self.status_label.setStyleSheet("color: #2e7d32;")
@@ -182,6 +189,52 @@ class InstallerDialog(QDialog):
             self.status_label.setStyleSheet("color: #f44336;")
             self.version_label.setText("")
             self.path_label.setText(f"Plugins path: {self.installer.get_plugins_path()}")
+
+        # Kick off the remote version check
+        self.update_label.setText(
+            "<span style='color:gray;'>Checking GitHub for the latest version…</span>"
+        )
+        self.installer.check_latest_version(self._on_latest_version_received)
+
+    def _on_latest_version_received(self, latest, error):
+        """Callback for the GitHub metadata.txt fetch.
+
+        :param latest: latest version string from master's metadata.txt, or None
+        :param error: Qt network error string, or None
+        """
+        if error or not latest:
+            self.update_label.setText(
+                f"<span style='color:#ff9800;'>Could not check for updates "
+                f"({error or 'no version found'})</span>"
+            )
+            return
+
+        installed = getattr(self, '_installed_version', None)
+
+        if not installed or installed == 'Unknown':
+            self.update_label.setText(
+                f"<span style='color:#1976d2;'>Latest available on master: "
+                f"<b>{latest}</b></span>"
+            )
+            return
+
+        cmp = self.installer.compare_versions(installed, latest)
+        if cmp < 0:
+            self.update_label.setText(
+                f"<span style='color:#d32f2f;font-weight:bold;'>"
+                f"Update available: {latest}</span> "
+                f"<span style='color:gray;'>(installed: {installed})</span>"
+            )
+        elif cmp == 0:
+            self.update_label.setText(
+                f"<span style='color:#2e7d32;'>Up to date "
+                f"(latest on master: {latest})</span>"
+            )
+        else:
+            self.update_label.setText(
+                f"<span style='color:gray;'>Installed version ({installed}) "
+                f"is newer than master ({latest})</span>"
+            )
 
     def log_message(self, message):
         """Add a message to the log."""

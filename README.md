@@ -39,6 +39,12 @@ Only the **stable master branch** is exposed — development branches are intent
 
 ## Changelog
 
+### 1.1.0 (2026-06-23)
+
+- Show whether an update is available. The dialog now fetches `metadata.txt` from `enzococca/HFF` master on `raw.githubusercontent.com`, parses the `version=` field, and compares it against the installed version.
+- Status line under the installed version shows one of: `Up to date (latest on master: X.Y.Z)`, `Update available: X.Y.Z (installed: A.B.C)`, `Latest available on master: X.Y.Z` (when HFF is not yet installed), or `Could not check for updates (…)` if the request fails.
+- Network check is non-blocking — the dialog opens immediately and updates the status line when the response arrives.
+
 ### 1.0.0 (2026-06-23)
 
 - Initial release.

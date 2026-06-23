@@ -30,6 +30,9 @@ class HFFInstaller:
     MASTER_BRANCH = "master"
 
     GITHUB_ZIP_URL = "https://github.com/{owner}/{repo}/archive/refs/heads/{branch}.zip"
+    GITHUB_RAW_METADATA_URL = (
+        "https://raw.githubusercontent.com/{owner}/{repo}/{branch}/metadata.txt"
+    )
 
     # Target folder name. The HFF plugin uses relative imports from v11.8 onwards,
     # but historical builds (and any code that resolves the package by name) expect
@@ -235,6 +238,87 @@ class HFFInstaller:
         self.current_reply.finished.connect(lambda: callback(self.current_reply))
 
         return self.current_reply
+
+    def check_latest_version(self, callback):
+        """Fetch the latest HFF version from the master branch's metadata.txt
+        on raw.githubusercontent.com.
+
+        :param callback: function(latest_version_str_or_None, error_message_or_None)
+        """
+        url = self.GITHUB_RAW_METADATA_URL.format(
+            owner=self.REPO_OWNER,
+            repo=self.REPO_NAME,
+            branch=self.MASTER_BRANCH,
+        )
+        request = QNetworkRequest(QUrl(url))
+        if hasattr(QNetworkRequest, 'FollowRedirectsAttribute'):
+            request.setAttribute(QNetworkRequest.FollowRedirectsAttribute, True)
+        elif hasattr(QNetworkRequest, 'RedirectPolicyAttribute'):
+            request.setAttribute(
+                QNetworkRequest.RedirectPolicyAttribute,
+                QNetworkRequest.NoLessSafeRedirectPolicy,
+            )
+
+        reply = self.network_manager.get(request)
+
+        def on_finished():
+            try:
+                if reply.error() != NETWORK_NO_ERROR:
+                    callback(None, reply.errorString())
+                    return
+                raw = bytes(reply.readAll()).decode('utf-8', errors='replace')
+                version = None
+                for line in raw.splitlines():
+                    s = line.strip()
+                    if s.lower().startswith('version'):
+                        # 'version=11.12' or 'version = 11.12'
+                        eq = s.find('=')
+                        if eq != -1:
+                            version = s[eq + 1:].strip()
+                            break
+                if not version:
+                    callback(None, "version field not found in metadata.txt")
+                    return
+                callback(version, None)
+            finally:
+                reply.deleteLater()
+
+        reply.finished.connect(on_finished)
+        return reply
+
+    @staticmethod
+    def parse_version(v):
+        """Turn a 'X.Y.Z' string into a tuple of ints for comparison.
+
+        Non-numeric segments are dropped. Returns () if nothing parseable —
+        which compares 'less than' every real version, matching the intuition
+        that an unknown installed version should trigger an update prompt.
+        """
+        if not v:
+            return ()
+        parts = []
+        for chunk in str(v).strip().split('.'):
+            digits = ''
+            for ch in chunk:
+                if ch.isdigit():
+                    digits += ch
+                else:
+                    break
+            if digits == '':
+                break
+            parts.append(int(digits))
+        return tuple(parts)
+
+    @classmethod
+    def compare_versions(cls, installed, latest):
+        """Return -1 / 0 / +1 where -1 means an update is available."""
+        a = cls.parse_version(installed)
+        b = cls.parse_version(latest)
+        if a < b:
+            return -1
+        if a > b:
+            return 1
+        return 0
 
     def install_plugin(self, progress_callback=None, finished_callback=None):
         """Download and install the plugin from the master branch.
