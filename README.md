@@ -37,6 +37,19 @@ Only the **stable master branch** is exposed — development branches are intent
 - The installed folder is renamed to `HFF` regardless of the zipball's top-level folder name.
 - An internet connection is required.
 
+## Changelog
+
+### 1.0.0 (2026-06-23)
+
+- Initial release.
+- Download the HFF plugin from `enzococca/HFF` (branch `master` only — development branches are intentionally hidden).
+- Detect existing installations under any of the common folder names (`HFF`, `HFF-master`, `HFF-main`, `hff`, …) and remove them before installing.
+- Always install into a folder named exactly `HFF`, so the relative imports introduced in HFF v11.8 keep working (a GitHub zipball would otherwise produce `HFF-master/` and break them).
+- Read installed version from `metadata.txt` and show it in the dialog before and after install.
+- Qt5/Qt6 enum compatibility — runs on both QGIS 3.x (Qt5) and QGIS 4.x (Qt6).
+- Indeterminate progress bar and inline log of each step (download → extract → remove existing → copy → cleanup).
+- Confirmation prompt before overwriting an existing installation.
+
 ## License
 
 GPL v2
